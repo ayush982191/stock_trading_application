@@ -81,13 +81,4 @@ public class UserController {
         return ResponseEntity.ok(userService.creditFunds(userId,amount));
     }
 
-
-
-
-
-
-
-
-
-
 }

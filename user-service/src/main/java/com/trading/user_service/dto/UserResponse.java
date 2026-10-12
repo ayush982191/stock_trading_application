@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class UserResponse {
     private String email;
-    private String password;
+//    private String password;
     private String firstName;
     private String lastName;
     private BigDecimal initialDeposit ;
