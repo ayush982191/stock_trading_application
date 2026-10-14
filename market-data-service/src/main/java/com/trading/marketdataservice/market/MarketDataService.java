@@ -131,6 +131,39 @@ public class MarketDataService {
         log.debug("prices updated for {} stocks",stockPriceDTOMap.size());
     }
 
+    /**
+     * get current price from redis.
+     * @return
+     */
+    public StockPriceDTO getPrice(String symbol){
+        Object cached = redisTemplate.opsForValue()
+                .get(PRICE_KEY_PREFIX+symbol);
+
+        if(cached != null){
+            return (StockPriceDTO) cached;
+        }
+        // fallback to memory.
+        StockPriceDTO priceDTO = stockPriceDTOMap.get(
+                symbol.toUpperCase()
+        );
+        if(priceDTO == null){
+            throw new RuntimeException("Stock not found {} "+symbol);
+        }
+        return priceDTO;
+
+    }
+
+    /**
+     * get all active stock prices.
+     * @return
+     */
+    public List<StockPriceDTO> getAllPrices() {
+        return stockPriceDTOMap.values().stream().toList();
+    }
+
+    public List<Stock> getAllStock(){
+        return stockRepository.findByActiveTrue();
+    }
 
 
 }
