@@ -7,7 +7,6 @@ import com.trading.orderservice.entity.OrderEntity;
 import com.trading.orderservice.entity.OrderStatus;
 import com.trading.orderservice.entity.OrderType;
 import com.trading.orderservice.repository.OrderRepository;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
