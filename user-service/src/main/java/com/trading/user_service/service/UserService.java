@@ -16,7 +16,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+
+import javax.crypto.SecretKey;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,6 +36,15 @@ public class UserService {
     private final KafkaTemplate<String,Object> kafkaTemplate;
     private static final String USER_REGISTERED_TOPIC = "user.registered";
     private final PasswordEncoder passwordEncoder; 
+
+    @Value("${jwt.secret:myDefaultSecretKeyThatIsAtLeast32CharsLong}")
+    private String jwtSecret;
+
+    @Value("${jwt.expiration:86400000}")
+    private long jwtExpiration;
+
+    @Value("${jwt.refresh-expiration:604800000}")
+    private long refreshExpiration;
 
 
     /**
@@ -64,8 +81,8 @@ public class UserService {
         userRegisterEvent.put("walletBalance",saveUser.getWalletBalance());
 
         kafkaTemplate.send(USER_REGISTERED_TOPIC,saveUser.getId(),userRegisterEvent);
-        String token = "token"; // generateAccessToken(saveUser.getId(),saveUser.getEmail());
-        String refreshToken= "refToken"; // generateRefreshToken(saveUser.getId(),saveUser.getEmail());
+        String token =   generateAccessToken(saveUser.getId(),saveUser.getEmail());
+        String refreshToken=   generateRefreshToken(saveUser.getId(),saveUser.getEmail());
         return buildAuthResponse(saveUser,token,refreshToken);
 
     }
@@ -83,9 +100,47 @@ public class UserService {
             throw new RuntimeException("Invalid credentials");
         }
         log.info("Login successful {} ",user.getId());
-        String token = "token"; // generateAccessToken(saveUser.getId(),saveUser.getEmail());
-        String refreshToken= "refToken"; // generateRefreshToken(saveUser.getId(),saveUser.getEmail());
+        String token = generateAccessToken(user.getId(),user.getEmail());
+        String refreshToken=  generateRefreshToken(user.getId(),user.getEmail());
         return buildAuthResponse(user,token,refreshToken);
+    }
+
+    private String generateRefreshToken(String id, String email) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + refreshExpiration);
+
+        return Jwts.builder()
+                .subject(email)
+                .claim("userId", id)
+                .claim("tokenType", "REFRESH")
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    private String generateAccessToken(String id, String email) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpiration);
+
+        return Jwts.builder()
+                .subject(email)
+                .claim("userId", id)
+                .claim("tokenType", "ACCESS")
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(jwtSecret);
+        } catch (Exception e) {
+            keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        }
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
 
