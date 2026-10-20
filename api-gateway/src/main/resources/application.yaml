@@ -54,7 +54,7 @@ server:
   port: 8080
 
 jwt:
-  secret: ${JWT_SECRET:}
+  secret: ${JWT_SECRET:bXlTZWNyZXRLZXlGb3JTdG9ja1RyYWRpbmdBcHBsaWNhdGlvbjEyMzQ1Njc4OTAhQCMk}
 
 management:
   endpoints:

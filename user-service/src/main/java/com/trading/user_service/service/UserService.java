@@ -34,7 +34,7 @@ import java.util.Map;
 public class UserService {
     private final UserRepository userRepository;
     private final KafkaTemplate<String,Object> kafkaTemplate;
-    private static final String USER_REGISTERED_TOPIC = "user.registered";
+    private static final String USER_REGISTERED_TOPIC = "user.register";
     private final PasswordEncoder passwordEncoder; 
 
     @Value("${jwt.secret:myDefaultSecretKeyThatIsAtLeast32CharsLong}")

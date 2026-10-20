@@ -23,7 +23,7 @@ server:
   port: 8081
 
 jwt:
-  secret: ${JWT_SECRET:myDefaultSecretKeyThatIsAtLeast32CharsLong}
+  secret: ${JWT_SECRET:bXlTZWNyZXRLZXlGb3JTdG9ja1RyYWRpbmdBcHBsaWNhdGlvbjEyMzQ1Njc4OTAhQCMk}
   expiration: 86400000
   refresh-expiration: 604800000
 
