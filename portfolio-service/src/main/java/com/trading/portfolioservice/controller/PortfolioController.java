@@ -19,7 +19,7 @@ public class PortfolioController {
      * @return
      */
     @GetMapping("/me")
-    private ResponseEntity<Map<String ,Object>> getMyPortfolio(
+    public ResponseEntity<Map<String ,Object>> getMyPortfolio(
             @RequestHeader("X-User-Id") String userId
     ){
         return ResponseEntity.ok(portfolioService.getPortfolio(userId));
@@ -32,7 +32,7 @@ public class PortfolioController {
      * @return
      */
     @GetMapping("/{userId}")
-    private ResponseEntity<Map<String ,Object>> getPortfolio(
+    public ResponseEntity<Map<String ,Object>> getPortfolio(
         @PathVariable String userId
     ){
         return ResponseEntity.ok(portfolioService.getPortfolio(userId));

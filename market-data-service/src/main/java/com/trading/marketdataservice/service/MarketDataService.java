@@ -1,8 +1,7 @@
-package com.trading.marketdataservice.market;
+package com.trading.marketdataservice.service;
 import com.trading.marketdataservice.dto.StockPriceDTO;
 import com.trading.marketdataservice.entity.Stock;
 import com.trading.marketdataservice.repository.StockRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -67,6 +66,11 @@ public class MarketDataService implements CommandLineRunner {
             stockPriceDTO.setTimestamp(LocalDateTime.now());
 
             stockPriceDTOMap.put(stock.getSymbol(),stockPriceDTO);
+            try {
+                redisTemplate.opsForValue().set(PRICE_KEY_PREFIX + stock.getSymbol(), stockPriceDTO);
+            } catch (Exception e) {
+                log.warn("Failed to seed initial price in Redis for {}: {}", stock.getSymbol(), e.getMessage());
+            }
             log.info("Loaded stock {} at {} ",stock.getSymbol(),stock.getInitialPrice());
         });
         log.info("Initialize {} stocks ",stockPriceDTOMap.size());
@@ -119,10 +123,10 @@ public class MarketDataService implements CommandLineRunner {
             // cache in redis
             redisTemplate.opsForValue().set(
                     PRICE_KEY_PREFIX + symbol,
-                    newPrice
+                    dto
             );
             // broadcast via websocket -> all clients.
-            messagingTemplate.convertAndSend("/topic/prices" + symbol,newPrice);
+            messagingTemplate.convertAndSend("/topic/prices/" + symbol, dto);
             // publish to kafka
             Map<String ,Object> priceUpdatedEvent = new HashMap<>();
             priceUpdatedEvent.put("symbol",symbol);
@@ -139,22 +143,33 @@ public class MarketDataService implements CommandLineRunner {
      * get current price from redis.
      * @return
      */
-    public StockPriceDTO getPrice(String symbol){
-        Object cached = redisTemplate.opsForValue()
-                .get(PRICE_KEY_PREFIX+symbol);
-
-        if(cached != null){
-            return (StockPriceDTO) cached;
+    public StockPriceDTO getPrice(String symbol) {
+        String key = PRICE_KEY_PREFIX + symbol.toUpperCase();
+        try {
+            Object cached = redisTemplate.opsForValue().get(key);
+            if (cached instanceof StockPriceDTO priceDTO) {
+                return priceDTO;
+            }
+        } catch (Exception e) {
+            log.warn("Error reading price from Redis for {}: {}", symbol, e.getMessage());
         }
+
         // fallback to memory.
         StockPriceDTO priceDTO = stockPriceDTOMap.get(
                 symbol.toUpperCase()
         );
-        if(priceDTO == null){
-            throw new RuntimeException("Stock not found {} "+symbol);
+        if (priceDTO == null) {
+            throw new RuntimeException("Stock not found: " + symbol);
         }
-        return priceDTO;
 
+        // cache valid DTO back to Redis
+        try {
+            redisTemplate.opsForValue().set(key, priceDTO);
+        } catch (Exception e) {
+            log.warn("Error refreshing price in Redis for {}: {}", symbol, e.getMessage());
+        }
+
+        return priceDTO;
     }
 
     /**

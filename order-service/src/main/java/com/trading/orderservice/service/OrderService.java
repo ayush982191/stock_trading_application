@@ -39,7 +39,6 @@ public class OrderService {
      * calculate total amount
      * execute
      * publish order event to kafka.
-     *
      */
     public OrderEntity placeOrder(OrderRequest request) {
         log.info("Placing {} order {}*{} for user {} ",request.getType(),request.getQuantity(),request.getSymbol(),request.getUserId());

@@ -1,7 +1,7 @@
 package com.trading.marketdataservice.controller;
 import com.trading.marketdataservice.dto.StockPriceDTO;
 import com.trading.marketdataservice.entity.Stock;
-import com.trading.marketdataservice.market.MarketDataService;
+import com.trading.marketdataservice.service.MarketDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Locale;
 
 
 @RestController
