@@ -32,3 +32,5 @@ management:
     web:
       exposure:
         include: health,info
+#         hanlding variables inside application
+initial_deposit : 1000

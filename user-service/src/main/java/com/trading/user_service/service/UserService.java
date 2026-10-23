@@ -8,24 +8,28 @@ import com.trading.user_service.dto.UserResponse;
 import com.trading.user_service.model.User;
 import com.trading.user_service.model.UserStatus;
 import com.trading.user_service.repository.UserRepository;
+// import jakarta.transaction.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
-
 import javax.crypto.SecretKey;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -35,7 +39,10 @@ public class UserService {
     private final UserRepository userRepository;
     private final KafkaTemplate<String,Object> kafkaTemplate;
     private static final String USER_REGISTERED_TOPIC = "user.register";
-    private final PasswordEncoder passwordEncoder; 
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${initial_deposit}")
+    private BigDecimal initialDeposit;
 
     @Value("${jwt.secret:myDefaultSecretKeyThatIsAtLeast32CharsLong}")
     private String jwtSecret;
@@ -53,24 +60,31 @@ public class UserService {
      * @return
      */
     public AuthResponse register(@Valid RegisterRequest request) {
-        log.info("registering user ",request.getEmail());
-        if(userRepository.existsByEmail(request.getEmail())){
+        log.info("registering user {} ",request.getEmail());
+        String normalizedEmail = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        if(userRepository.existsByEmail(normalizedEmail)){
             throw new RuntimeException("Email already registered "+request.getEmail());
         }
 //        User user = User.builder()
 //                .firstName(request.getFirstName())
         User user = new User();
-        user.setEmail(request.getEmail());
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
-        user.setWalletBalance(request.getInitialDeposit() != null ?
-                request.getInitialDeposit() :
-                BigDecimal.valueOf(1000)
+        user.setWalletBalance(initialDeposit
                 );
         user.setStatus(UserStatus.ACTIVE);
-        User saveUser = userRepository.save(user);
-        log.info("User registered : {} ",saveUser.getId());
+//        User saveUser = userRepository.save(user);
+        User saveUser;
+        try{
+            saveUser = userRepository.saveAndFlush(user);
+            log.info("User registered : {} ",saveUser.getId());
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent registration collision detected for email: {}", request.getEmail());
+            throw new RuntimeException("Email already registered: " + request.getEmail());
+        }
+
 
         // publish use.regitered event.
         Map<String ,Object> userRegisterEvent = new HashMap<>();
@@ -188,7 +202,7 @@ public class UserService {
         user.setWalletBalance(user.getWalletBalance().add(amount));
         User savedUser = userRepository.save(user);
         log.info("funds added {} to user {} ",amount,user);
-        return mapToResponse(user);
+        return mapToResponse(savedUser);
 
     }
 
@@ -198,32 +212,46 @@ public class UserService {
      * @param amount
      * @return
      */
+    @Transactional
     public UserResponse deductFunds(
             String userId, BigDecimal amount
     ){
+         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+        throw new IllegalArgumentException("Deduction amount must be strictly positive");
+    }
         User user= userRepository.findById(userId)
                 .orElseThrow(()->new RuntimeException("user not found "+userId))
                 ;
-        if (user.getWalletBalance().compareTo(amount)<0){
-            throw new RuntimeException("Insufficient balance");
+        int rowsUpdated = userRepository.deductBalance(userId,amount);
+        if(rowsUpdated == 0){
+            throw new RuntimeException(String.format("Insufficient balance. Required: %s, Current: %s", amount, user.getWalletBalance()));
 
         }
-        user.setWalletBalance(user.getWalletBalance().subtract(amount));
-        log.info("Funds deduct {} to user {} ",amount,user);
-        userRepository.save(user);
-        return mapToResponse(user);
+        User updatedUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("user not found " + userId));
+        log.info("Successfully deducted {} from user {}", amount, userId);
+        return mapToResponse(updatedUser);
 
     }
     /*
         credit funds to wallet called on SELL order
      */
+@Transactional
     public UserResponse creditFunds(String userId, BigDecimal amount){
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Deduction amount must be strictly positive");
+        }
         User user= userRepository.findById(userId)
                 .orElseThrow(()->new RuntimeException("user not found "+userId))
                 ;
-        user.setWalletBalance(user.getWalletBalance().add(amount));
-        User savedUser = userRepository.save(user);
-        log.info("funds added {} to user {} ",amount,user);
-        return mapToResponse(savedUser);
+        int rowsUpdated = userRepository.creditBalance(userId,amount);
+        if(rowsUpdated == 0){
+            throw new RuntimeException(String.format("user not found: %s", user));
+
+        }
+        User updatedUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("user not found " + userId));
+        log.info("Successfully credited {} from user {}", amount, userId);
+        return mapToResponse(updatedUser);
     }
 }

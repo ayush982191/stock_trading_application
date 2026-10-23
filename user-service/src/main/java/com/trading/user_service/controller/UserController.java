@@ -60,7 +60,7 @@ public class UserController {
             @PathVariable String userId,
             @RequestParam BigDecimal amount
             ){
-        return ResponseEntity.ok(userService.addFunds(userId,amount));
+        return ResponseEntity.ok(userService.creditFunds(userId,amount));
 
     }
 

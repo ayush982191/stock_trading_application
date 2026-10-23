@@ -20,6 +20,5 @@ public class RegisterRequest {
     private String firstName;
     @NotBlank(message = "Last Name is required")
     private String lastName;
-    private BigDecimal initialDeposit = BigDecimal.valueOf(10000);
 
 }
